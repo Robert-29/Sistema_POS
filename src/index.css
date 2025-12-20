@@ -1,1 +1,17 @@
 @import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-primary: #2563eb;
+    --color-primary-light: #eff6ff;
+    --color-dark-blue: #111d3b;
+    --color-gray-text: #64748b;
+
+    --font-inter: "Inter", system-ui, sans-serif;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900;
+    font-family: var(--font-inter);
+  }
+}
