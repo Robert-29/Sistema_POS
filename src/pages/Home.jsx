@@ -1,12 +1,13 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 const Home = () => {
   return (
     <main className="pt-32 pb-20 px-4">
-      
+
       {/* Hero Section */}
       <section className="max-w-4xl mx-auto text-center">
-        
+
         {/* Badge */}
         <div className="flex justify-center mb-8">
           <div className="bg-blue-100 text-blue-600 px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2 shadow-sm">
@@ -34,14 +35,15 @@ const Home = () => {
 
         {/* Buttons */}
         <div className="flex flex-col sm:flex-row justify-center gap-4 mb-8">
-          
-          <button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3.5 rounded-lg transition-all duration-200 flex items-center gap-2 text-lg shadow-lg shadow-blue-500/20 cursor-pointer">
+
+          <Link to="/auth" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 text-lg shadow-lg shadow-blue-500/20 cursor-pointer">
             Crear mi Cuenta Gratis
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
-          </button>
+          </Link>
         </div>
+
 
         {/* Trust Badges */}
         <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-slate-600 font-medium">
