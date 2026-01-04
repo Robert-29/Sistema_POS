@@ -15,16 +15,21 @@ import {
     Plus
 } from 'lucide-react';
 
-const Sidebar = ({ negocio }) => {
+const Sidebar = ({ negocio, posSession }) => {
     const location = useLocation();
     const navigate = useNavigate();
 
     const handleLogout = async () => {
-        await supabase.auth.signOut();
-        navigate('/');
+        if (posSession) {
+            localStorage.removeItem('pos_session');
+            window.location.href = '/auth';
+        } else {
+            await supabase.auth.signOut();
+            navigate('/');
+        }
     };
 
-    const menuItems = [
+    const allMenuItems = [
         { icon: <LayoutDashboard size={20} />, label: 'Dashboard', path: '/' },
         { icon: <ShoppingCart size={20} />, label: 'Punto de Venta', path: '/pos' },
         { icon: <Package size={20} />, label: 'Productos', path: '/inventario' },
@@ -35,7 +40,11 @@ const Sidebar = ({ negocio }) => {
         { icon: <CreditCard size={20} />, label: 'Pagos', path: '/pagos' },
     ];
 
-    const bottomItems = [
+    const menuItems = posSession
+        ? allMenuItems.filter(item => ['/pos', '/inventario', '/transacciones'].includes(item.path))
+        : allMenuItems;
+
+    const bottomItems = posSession ? [] : [
         { icon: <Building2 size={20} />, label: 'Mi Empresa', path: '/dashboard' },
         { icon: <Settings size={20} />, label: 'Configuración', path: '/configuracion' },
     ];
@@ -50,6 +59,12 @@ const Sidebar = ({ negocio }) => {
                 <div>
                     <h2 className="text-white font-bold text-xl tracking-tight">VentasPro</h2>
                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{negocio?.nombre_negocio || 'Cargando...'}</p>
+                    {posSession && (
+                        <div className="flex items-center gap-1 mt-1">
+                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                            <span className="text-[9px] text-emerald-500 font-bold uppercase">{posSession.pos.nombre}</span>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -91,7 +106,7 @@ const Sidebar = ({ negocio }) => {
                     className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all font-medium text-red-400 hover:bg-red-500/10"
                 >
                     <LogOut size={20} />
-                    <span className="text-sm">Cerrar Sesión</span>
+                    <span className="text-sm">{posSession ? 'Cerrar Terminal' : 'Cerrar Sesión'}</span>
                 </button>
             </div>
         </div>

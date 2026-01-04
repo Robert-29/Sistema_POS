@@ -29,6 +29,8 @@ const Personal = ({ negocio }) => {
         id_sucursal: '',
         // For POS
         nombre_pos: '',
+        identificador: '',
+        codigo_acceso: '',
         estado: 'activo'
     });
 
@@ -79,7 +81,9 @@ const Personal = ({ negocio }) => {
                 const data = {
                     id_negocio: negocio.id,
                     nombre: formData.nombre_pos,
+                    identificador: formData.identificador,
                     id_sucursal: formData.id_sucursal,
+                    codigo_acceso: formData.codigo_acceso,
                     estado: formData.estado
                 };
 
@@ -117,6 +121,8 @@ const Personal = ({ negocio }) => {
             rol: 'cajero',
             id_sucursal: '',
             nombre_pos: '',
+            identificador: '',
+            codigo_acceso: '',
             estado: 'activo'
         });
     };
@@ -141,6 +147,8 @@ const Personal = ({ negocio }) => {
                 rol: 'cajero',
                 id_sucursal: item.id_sucursal,
                 nombre_pos: item.nombre,
+                identificador: item.identificador || '',
+                codigo_acceso: item.codigo_acceso || '',
                 estado: item.estado
             });
         }
@@ -331,16 +339,40 @@ const Personal = ({ negocio }) => {
                                         </div>
                                     </>
                                 ) : (
-                                    <div>
-                                        <label className="block text-sm font-bold text-slate-700 mb-2">Nombre del Punto de Venta</label>
-                                        <input
-                                            type="text"
-                                            required
-                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                                            value={formData.nombre_pos}
-                                            onChange={(e) => setFormData({ ...formData, nombre_pos: e.target.value })}
-                                            placeholder="Ej. Caja Principal"
-                                        />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="col-span-2">
+                                            <label className="block text-sm font-bold text-slate-700 mb-2">Nombre del Punto de Venta</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                                                value={formData.nombre_pos}
+                                                onChange={(e) => setFormData({ ...formData, nombre_pos: e.target.value })}
+                                                placeholder="Ej. Caja Principal"
+                                            />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="block text-sm font-bold text-slate-700 mb-2">Identificador Único (para login)</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none font-mono"
+                                                value={formData.identificador}
+                                                onChange={(e) => setFormData({ ...formData, identificador: e.target.value })}
+                                                placeholder="Ej. caja1_sucursalnorte"
+                                            />
+                                        </div>
+                                        <div className="col-span-2">
+                                            <label className="block text-sm font-bold text-slate-700 mb-2">Código de Acceso (PIN)</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                                                value={formData.codigo_acceso}
+                                                onChange={(e) => setFormData({ ...formData, codigo_acceso: e.target.value })}
+                                                placeholder="Ej. 1234"
+                                            />
+                                        </div>
                                     </div>
                                 )}
 

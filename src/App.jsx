@@ -15,36 +15,60 @@ import Personal from './pages/Personal';
 function App() {
   const [session, setSession] = useState(null);
   const [negocio, setNegocio] = useState(null);
+  const [posSession, setPosSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // 1. Check for normal session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchNegocio(session.user.id);
-      else setLoading(false);
+      if (session) fetchNegocio(session.user.id, session.user.email);
+      else checkPosSession();
     });
+
+    // 2. Check for POS session
+    const checkPosSession = () => {
+      const savedPos = localStorage.getItem('pos_session');
+      if (savedPos) {
+        const parsed = JSON.parse(savedPos);
+        setPosSession(parsed);
+        setNegocio(parsed.negocio);
+      }
+      setLoading(false);
+    };
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) fetchNegocio(session.user.id);
+      if (session) fetchNegocio(session.user.id, session.user.email);
       else {
         setNegocio(null);
-        setLoading(false);
+        checkPosSession();
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchNegocio = async (userId) => {
+  const fetchNegocio = async (userId, userEmail) => {
     const { data } = await supabase
       .from('perfiles_negocio')
       .select('*')
       .eq('id', userId)
       .maybeSingle();
-    setNegocio(data);
+
+    if (data) {
+      // Sync owner email if it's missing or different
+      if (userEmail && data.email_propietario !== userEmail) {
+        await supabase
+          .from('perfiles_negocio')
+          .update({ email_propietario: userEmail })
+          .eq('id', userId);
+        data.email_propietario = userEmail;
+      }
+      setNegocio(data);
+    }
     setLoading(false);
   };
 
@@ -56,17 +80,19 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Layout session={session} negocio={negocio}>
-        {!session && <Navbar session={session} />}
+      <Layout session={session} negocio={negocio} posSession={posSession}>
+        {!session && !posSession && <Navbar session={session} />}
         <Routes>
-          <Route path="/" element={!session ? <Home /> : <Navigate to="/dashboard" />} />
-          <Route path="/auth" element={!session ? <Auth /> : <Navigate to="/dashboard" />} />
+          <Route path="/" element={(!session && !posSession) ? <Home /> : <Navigate to="/dashboard" />} />
+          <Route path="/auth" element={(!session && !posSession) ? <Auth /> : <Navigate to="/dashboard" />} />
           <Route path="/onboarding" element={session ? (negocio ? <Navigate to="/dashboard" /> : <Onboarding />) : <Navigate to="/auth" />} />
-          <Route path="/dashboard" element={session ? (negocio ? <Dashboard negocio={negocio} /> : <Navigate to="/onboarding" />) : <Navigate to="/auth" />} />
-          <Route path="/inventario" element={session ? <Inventario /> : <Navigate to="/auth" />} />
-          <Route path="/pos" element={session ? <POS /> : <Navigate to="/auth" />} />
+
+          <Route path="/dashboard" element={(session || posSession) ? (negocio ? <Dashboard negocio={negocio} posSession={posSession} /> : <Navigate to="/onboarding" />) : <Navigate to="/auth" />} />
+          <Route path="/inventario" element={(session || posSession) ? <Inventario /> : <Navigate to="/auth" />} />
+          <Route path="/pos" element={(session || posSession) ? <POS /> : <Navigate to="/auth" />} />
           <Route path="/configuracion" element={session ? <Configuracion negocio={negocio} /> : <Navigate to="/auth" />} />
           <Route path="/personal" element={session ? <Personal negocio={negocio} /> : <Navigate to="/auth" />} />
+          <Route path="/transacciones" element={(session || posSession) ? <div className="p-8">Historial de Ventas (Próximamente)</div> : <Navigate to="/auth" />} />
         </Routes>
       </Layout>
     </BrowserRouter>
