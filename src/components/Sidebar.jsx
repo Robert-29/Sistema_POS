@@ -15,18 +15,16 @@ import {
     Plus
 } from 'lucide-react';
 
-const Sidebar = ({ negocio, posSession }) => {
+import useStore from '../store/useStore';
+
+const Sidebar = () => {
+    const { business, posSession, employeeSession, clearSessions } = useStore();
     const location = useLocation();
     const navigate = useNavigate();
 
     const handleLogout = async () => {
-        if (posSession) {
-            localStorage.removeItem('pos_session');
-            window.location.href = '/auth';
-        } else {
-            await supabase.auth.signOut();
-            navigate('/');
-        }
+        clearSessions();
+        navigate('/auth');
     };
 
     const allMenuItems = [
@@ -36,15 +34,28 @@ const Sidebar = ({ negocio, posSession }) => {
         { icon: <ArrowLeftRight size={20} />, label: 'Transacciones', path: '/transacciones' },
         { icon: <Users size={20} />, label: 'Personal', path: '/personal' },
         { icon: <Users size={20} />, label: 'Clientes', path: '/clientes' },
+        { icon: <ArrowLeftRight size={20} />, label: 'Traslados', path: '/traslados' },
         { icon: <BarChart3 size={20} />, label: 'Reportes', path: '/reportes' },
+        { icon: <CreditCard size={20} />, label: 'Finanzas', path: '/finanzas' },
         { icon: <CreditCard size={20} />, label: 'Pagos', path: '/pagos' },
     ];
 
-    const menuItems = posSession
-        ? allMenuItems.filter(item => ['/pos', '/inventario', '/transacciones'].includes(item.path))
-        : allMenuItems;
+    let menuItems = allMenuItems;
 
-    const bottomItems = posSession ? [] : [
+    if (posSession) {
+        menuItems = allMenuItems.filter(item => ['/pos', '/inventario', '/transacciones'].includes(item.path));
+    } else if (employeeSession) {
+        const role = employeeSession.role;
+        if (role === 'administrador') {
+            menuItems = allMenuItems;
+        } else if (role === 'supervisor') {
+            menuItems = allMenuItems.filter(item => ['/', '/pos', '/inventario', '/transacciones', '/clientes', '/traslados'].includes(item.path));
+        } else { // cajero
+            menuItems = allMenuItems.filter(item => ['/pos', '/inventario', '/transacciones'].includes(item.path));
+        }
+    }
+
+    const bottomItems = (posSession || employeeSession) ? [] : [
         { icon: <Building2 size={20} />, label: 'Mi Empresa', path: '/dashboard' },
         { icon: <Settings size={20} />, label: 'Configuración', path: '/configuracion' },
     ];
@@ -58,11 +69,17 @@ const Sidebar = ({ negocio, posSession }) => {
                 </div>
                 <div>
                     <h2 className="text-white font-bold text-xl tracking-tight">VentasPro</h2>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{negocio?.nombre_negocio || 'Cargando...'}</p>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{business?.nombre_negocio || 'Cargando...'}</p>
                     {posSession && (
                         <div className="flex items-center gap-1 mt-1">
                             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                             <span className="text-[9px] text-emerald-500 font-bold uppercase">{posSession.pos.nombre}</span>
+                        </div>
+                    )}
+                    {employeeSession && (
+                        <div className="flex items-center gap-1 mt-1">
+                            <div className="w-1.5 h-1.5 bg-blue-400 rounded-full" />
+                            <span className="text-[9px] text-blue-400 font-bold uppercase">{employeeSession.user.nombre} ({employeeSession.role})</span>
                         </div>
                     )}
                 </div>
@@ -106,7 +123,7 @@ const Sidebar = ({ negocio, posSession }) => {
                     className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all font-medium text-red-400 hover:bg-red-500/10"
                 >
                     <LogOut size={20} />
-                    <span className="text-sm">{posSession ? 'Cerrar Terminal' : 'Cerrar Sesión'}</span>
+                    <span className="text-sm">{posSession ? 'Cerrar Terminal' : (employeeSession ? 'Cerrar Sesión Empleado' : 'Cerrar Sesión')}</span>
                 </button>
             </div>
         </div>

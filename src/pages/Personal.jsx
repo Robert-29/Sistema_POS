@@ -12,7 +12,10 @@ import {
     Monitor
 } from 'lucide-react';
 
-const Personal = ({ negocio }) => {
+import useStore from '../store/useStore';
+
+const Personal = () => {
+    const { business } = useStore();
     const [activeTab, setActiveTab] = useState('usuarios');
     const [usuarios, setUsuarios] = useState([]);
     const [sucursales, setSucursales] = useState([]);
@@ -24,29 +27,36 @@ const Personal = ({ negocio }) => {
     const [formData, setFormData] = useState({
         nombre: '',
         username: '',
+        email: '',
         password: '',
-        rol: 'cajero',
+        rol: 'cajero', // Deprecated but kept for compatibility schema if needed
+        permisos: {
+            can_sell: true,
+            can_view_stock: true,
+            can_manage_products: false,
+            can_view_reports: false
+        },
         id_sucursal: '',
+        matricula: '',
         // For POS
         nombre_pos: '',
         identificador: '',
-        codigo_acceso: '',
         estado: 'activo'
     });
 
     useEffect(() => {
-        if (negocio?.id) {
+        if (business?.id) {
             fetchData();
         }
-    }, [negocio]);
+    }, [business]);
 
     const fetchData = async () => {
         setLoading(true);
         try {
             const [usersData, branchesData, posData] = await Promise.all([
-                supabase.from('usuarios_sucursal').select('*, sucursales(nombre)').eq('id_negocio', negocio.id),
-                supabase.from('sucursales').select('*').eq('id_negocio', negocio.id),
-                supabase.from('puntos_venta').select('*, sucursales(nombre)').eq('id_negocio', negocio.id)
+                supabase.from('usuarios_sucursal').select('*, sucursales(nombre)').eq('id_negocio', business.id),
+                supabase.from('sucursales').select('*').eq('id_negocio', business.id),
+                supabase.from('puntos_venta').select('*, sucursales(nombre)').eq('id_negocio', business.id)
             ]);
 
             setUsuarios(usersData.data || []);
@@ -64,12 +74,15 @@ const Personal = ({ negocio }) => {
         try {
             if (activeTab === 'usuarios') {
                 const data = {
-                    id_negocio: negocio.id,
+                    id_negocio: business.id,
                     nombre: formData.nombre,
                     username: formData.username,
+                    email: formData.email,
                     password: formData.password,
-                    rol: formData.rol,
-                    id_sucursal: formData.id_sucursal || null
+                    rol: 'personal', // Default role for all employees now
+                    permisos: formData.permisos,
+                    id_sucursal: formData.id_sucursal || null,
+                    matricula: formData.matricula
                 };
 
                 if (editingItem) {
@@ -79,11 +92,11 @@ const Personal = ({ negocio }) => {
                 }
             } else {
                 const data = {
-                    id_negocio: negocio.id,
+                    id_negocio: business.id,
                     nombre: formData.nombre_pos,
                     identificador: formData.identificador,
                     id_sucursal: formData.id_sucursal,
-                    codigo_acceso: formData.codigo_acceso,
+                    matricula: formData.matricula,
                     estado: formData.estado
                 };
 
@@ -114,15 +127,23 @@ const Personal = ({ negocio }) => {
     };
 
     const resetForm = () => {
+        const randomMatricula = Math.floor(100000 + Math.random() * 900000).toString();
         setFormData({
             nombre: '',
             username: '',
+            email: '',
             password: '',
             rol: 'cajero',
+            permisos: {
+                can_sell: true,
+                can_view_stock: true,
+                can_manage_products: false,
+                can_view_reports: false
+            },
             id_sucursal: '',
+            matricula: randomMatricula,
             nombre_pos: '',
             identificador: '',
-            codigo_acceso: '',
             estado: 'activo'
         });
     };
@@ -133,9 +154,17 @@ const Personal = ({ negocio }) => {
             setFormData({
                 nombre: item.nombre,
                 username: item.username,
+                email: item.email || '',
                 password: item.password,
                 rol: item.rol,
+                permisos: item.permisos || {
+                    can_sell: true,
+                    can_view_stock: true,
+                    can_manage_products: false,
+                    can_view_reports: false
+                },
                 id_sucursal: item.id_sucursal || '',
+                matricula: item.matricula || item.pin_acceso || '',
                 nombre_pos: '',
                 estado: 'activo'
             });
@@ -145,10 +174,11 @@ const Personal = ({ negocio }) => {
                 username: '',
                 password: '',
                 rol: 'cajero',
+                permisos: {},
                 id_sucursal: item.id_sucursal,
                 nombre_pos: item.nombre,
                 identificador: item.identificador || '',
-                codigo_acceso: item.codigo_acceso || '',
+                matricula: item.matricula || item.codigo_acceso || '',
                 estado: item.estado
             });
         }
@@ -222,14 +252,30 @@ const Personal = ({ negocio }) => {
                                 <div className="space-y-2 mt-4">
                                     <div className="flex items-center gap-2 text-sm text-slate-500">
                                         <Shield size={16} />
-                                        <span>Rol: <span className="text-slate-900 font-medium capitalize">{user.rol}</span></span>
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                            {user.permisos ? (
+                                                <>
+                                                    {user.permisos.can_sell && <span className="text-[10px] bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-bold">Ventas</span>}
+                                                    {user.permisos.can_manage_products && <span className="text-[10px] bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full font-bold">Productos</span>}
+                                                    {user.permisos.can_view_stock && <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">Stock</span>}
+                                                    {user.permisos.can_view_reports && <span className="text-[10px] bg-orange-50 text-orange-700 px-2 py-0.5 rounded-full font-bold">Reportes</span>}
+                                                </>
+                                            ) : (
+                                                <span className="text-slate-900 font-medium capitalize">{user.rol}</span>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-2 text-sm text-slate-500">
                                         <Building2 size={16} />
                                         <span>Sucursal: <span className="text-slate-900 font-medium">{user.sucursales?.nombre || 'General'}</span></span>
                                     </div>
+                                    <div className="flex items-center gap-2 text-sm text-slate-500">
+                                        <Monitor size={16} />
+                                        <span>Matrícula: <span className="text-blue-600 font-bold tracking-widest">{user.matricula || user.pin_acceso || 'Sin Matrícula'}</span></span>
+                                    </div>
                                     <div className="flex items-center gap-2 text-sm text-slate-400">
                                         <span className="bg-slate-100 px-2 py-1 rounded text-[10px] uppercase font-bold tracking-wider">@{user.username}</span>
+                                        {user.email && <span className="truncate max-w-[120px] bg-slate-100 px-2 py-1 rounded text-[10px] lowercase font-medium tracking-tight text-slate-500">{user.email}</span>}
                                     </div>
                                 </div>
                             </div>
@@ -255,6 +301,10 @@ const Personal = ({ negocio }) => {
                                     <div className="flex items-center gap-2 text-sm text-slate-500">
                                         <Building2 size={16} />
                                         <span>Sucursal: <span className="text-slate-900 font-medium">{pos.sucursales?.nombre}</span></span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm text-slate-500">
+                                        <Monitor size={16} />
+                                        <span>Matrícula: <span className="text-blue-600 font-bold tracking-widest">{pos.matricula || pos.codigo_acceso || 'Sin Matrícula'}</span></span>
                                     </div>
                                     <div className="flex items-center gap-2 text-sm">
                                         <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase transition-all ${pos.estado === 'activo' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
@@ -314,6 +364,74 @@ const Personal = ({ negocio }) => {
                                                 />
                                             </div>
                                             <div>
+                                                <label className="block text-sm font-bold text-slate-700 mb-2">Email</label>
+                                                <input
+                                                    type="email"
+                                                    className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
+                                                    value={formData.email}
+                                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                                    placeholder="juan@email.com"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="col-span-2 space-y-4">
+                                                <h3 className="font-bold text-slate-700 text-sm">Permisos y Accesos</h3>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                                                            checked={formData.permisos?.can_sell || false}
+                                                            onChange={(e) => setFormData({
+                                                                ...formData,
+                                                                permisos: { ...formData.permisos, can_sell: e.target.checked }
+                                                            })}
+                                                        />
+                                                        <span className="text-sm font-medium text-slate-700">Realizar Ventas</span>
+                                                    </label>
+
+                                                    <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                                                            checked={formData.permisos?.can_manage_products || false}
+                                                            onChange={(e) => setFormData({
+                                                                ...formData,
+                                                                permisos: { ...formData.permisos, can_manage_products: e.target.checked }
+                                                            })}
+                                                        />
+                                                        <span className="text-sm font-medium text-slate-700">Gestionar Productos</span>
+                                                    </label>
+
+                                                    <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                                                            checked={formData.permisos?.can_view_stock || false}
+                                                            onChange={(e) => setFormData({
+                                                                ...formData,
+                                                                permisos: { ...formData.permisos, can_view_stock: e.target.checked }
+                                                            })}
+                                                        />
+                                                        <span className="text-sm font-medium text-slate-700">Ver Inventario</span>
+                                                    </label>
+
+                                                    <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                                                            checked={formData.permisos?.can_view_reports || false}
+                                                            onChange={(e) => setFormData({
+                                                                ...formData,
+                                                                permisos: { ...formData.permisos, can_view_reports: e.target.checked }
+                                                            })}
+                                                        />
+                                                        <span className="text-sm font-medium text-slate-700">Ver Reportes</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div>
                                                 <label className="block text-sm font-bold text-slate-700 mb-2">Contraseña</label>
                                                 <input
                                                     type="password"
@@ -326,16 +444,31 @@ const Personal = ({ negocio }) => {
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-bold text-slate-700 mb-2">Rol</label>
-                                            <select
-                                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                                                value={formData.rol}
-                                                onChange={(e) => setFormData({ ...formData, rol: e.target.value })}
-                                            >
-                                                <option value="cajero">Cajero</option>
-                                                <option value="supervisor">Supervisor</option>
-                                                <option value="administrador">Administrador</option>
-                                            </select>
+                                            <div className="flex justify-between items-center mb-2">
+                                                <label className="block text-sm font-bold text-slate-700">Matrícula (6 dígitos)</label>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const randomMatricula = Math.floor(100000 + Math.random() * 900000).toString();
+                                                        setFormData(prev => ({ ...prev, matricula: randomMatricula }));
+                                                    }}
+                                                    className="text-[10px] font-bold text-blue-600 uppercase hover:underline"
+                                                >
+                                                    Generar Matrícula
+                                                </button>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                maxLength={6}
+                                                required
+                                                className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none font-mono text-center text-lg tracking-[0.5em]"
+                                                value={formData.matricula}
+                                                onChange={(e) => {
+                                                    const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+                                                    setFormData({ ...formData, matricula: val });
+                                                }}
+                                                placeholder="000000"
+                                            />
                                         </div>
                                     </>
                                 ) : (
@@ -363,14 +496,26 @@ const Personal = ({ negocio }) => {
                                             />
                                         </div>
                                         <div className="col-span-2">
-                                            <label className="block text-sm font-bold text-slate-700 mb-2">Código de Acceso (PIN)</label>
+                                            <div className="flex justify-between items-center mb-2">
+                                                <label className="block text-sm font-bold text-slate-700">Matrícula (Código de Acceso)</label>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const randomMatricula = Math.floor(100000 + Math.random() * 900000).toString();
+                                                        setFormData(prev => ({ ...prev, matricula: randomMatricula }));
+                                                    }}
+                                                    className="text-[10px] font-bold text-blue-600 uppercase hover:underline"
+                                                >
+                                                    Generar Matrícula
+                                                </button>
+                                            </div>
                                             <input
                                                 type="text"
                                                 required
                                                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all outline-none"
-                                                value={formData.codigo_acceso}
-                                                onChange={(e) => setFormData({ ...formData, codigo_acceso: e.target.value })}
-                                                placeholder="Ej. 1234"
+                                                value={formData.matricula}
+                                                onChange={(e) => setFormData({ ...formData, matricula: e.target.value })}
+                                                placeholder="Ej. 123456"
                                             />
                                         </div>
                                     </div>

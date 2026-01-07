@@ -5,11 +5,10 @@ import { supabase } from '../lib/supabase';
 import { User, Mail, Lock, Eye, EyeOff, LogIn, Github } from 'lucide-react';
 
 const Auth = () => {
-    const [authMode, setAuthMode] = useState('login'); // 'login', 'signup', 'terminal'
+    const [authMode, setAuthMode] = useState('login'); // 'login' or 'signup'
     const [showPassword, setShowPassword] = useState(false);
-    const [email, setEmail] = useState('');
+    const [identifier, setIdentifier] = useState(''); // Unified field for email/user/terminal
     const [password, setPassword] = useState('');
-    const [terminalCode, setTerminalCode] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const navigate = useNavigate();
@@ -21,61 +20,71 @@ const Auth = () => {
         setError(null);
 
         try {
-            if (authMode === 'terminal') {
-                // 1. Find the POS with the identifier and code
-                const { data: pos, error: pError } = await supabase
-                    .from('puntos_venta')
-                    .select('*, sucursales(nombre)')
-                    .eq('identificador', email) // 'email' field in form is now used for 'identificador'
-                    .eq('codigo_acceso', terminalCode)
-                    .eq('estado', 'activo')
-                    .maybeSingle();
-
-                if (!pos) throw new Error('Identificador o Código de acceso incorrecto.');
-
-                // 2. Get the business details
-                const { data: business, error: bError } = await supabase
-                    .from('perfiles_negocio')
-                    .select('id, nombre_negocio')
-                    .eq('id', pos.id_negocio)
-                    .maybeSingle();
-
-                if (!business) throw new Error('No se encontró el negocio asociado a esta terminal.');
-
-                // 3. Save session to localStorage
-                const posSession = {
-                    pos: pos,
-                    negocio: business,
-                    activatedAt: new Date().toISOString()
-                };
-                localStorage.setItem('pos_session', JSON.stringify(posSession));
-
-                // Trigger a page reload to update App state
-                window.location.href = '/pos';
-                return;
-            }
-
             if (authMode === 'login') {
-                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-                if (error) throw error;
+                const cleanIdentifier = identifier.trim();
 
-                // Check if user has a profile
-                const { data: profile } = await supabase
-                    .from('perfiles_negocio')
-                    .select('id')
-                    .eq('id', data.user.id)
-                    .single();
+                // 1. INTENTAR LOGIN DE PERSONAL (Empleados)
+                const { data: empData, error: empRpcError } = await supabase.rpc('login_employee', {
+                    p_identifier: cleanIdentifier,
+                    p_password: password
+                });
 
-
-                if (profile) {
-                    navigate('/');
-                } else {
-                    navigate('/onboarding');
+                if (empData) {
+                    const employeeSession = {
+                        user: empData.employee,
+                        negocio: empData.negocio,
+                        role: empData.employee.rol,
+                        activatedAt: new Date().toISOString()
+                    };
+                    localStorage.setItem('employee_session', JSON.stringify(employeeSession));
+                    window.location.href = '/dashboard';
+                    return;
                 }
+
+                // 2. INTENTAR LOGIN DE TERMINAL (Punto de Venta)
+                const { data: posData, error: posRpcError } = await supabase.rpc('login_pos', {
+                    p_identificador: cleanIdentifier,
+                    p_matricula: password
+                });
+
+                if (posData) {
+                    const posSession = {
+                        pos: posData.pos,
+                        negocio: posData.negocio,
+                        activatedAt: new Date().toISOString()
+                    };
+                    localStorage.setItem('pos_session', JSON.stringify(posSession));
+                    window.location.href = '/pos';
+                    return;
+                }
+
+                // 3. INTENTAR LOGIN DE ADMINISTRADOR (Supabase Auth)
+                // Solo intentamos si parece un formato de email válido
+                if (cleanIdentifier.includes('@')) {
+                    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+                        email: cleanIdentifier,
+                        password: password
+                    });
+
+                    if (!authError && authData.user) {
+                        const { data: profile } = await supabase
+                            .from('perfiles_negocio')
+                            .select('id')
+                            .eq('user_id', authData.user.id)
+                            .maybeSingle();
+
+                        if (profile) window.location.href = '/dashboard';
+                        else window.location.href = '/onboarding';
+                        return;
+                    }
+                }
+
+                throw new Error('No se encontró ninguna cuenta con estas credenciales o la contraseña es incorrecta.');
             } else {
+                // ... signup logic
                 const { data, error } = await supabase.auth.signUp({
-                    email,
-                    password,
+                    email: identifier,
+                    password: password,
                     options: {
                         emailRedirectTo: window.location.origin + '/auth'
                     }
@@ -83,7 +92,7 @@ const Auth = () => {
                 if (error) throw error;
 
                 if (data?.user && data?.session === null) {
-                    alert('¡Registro casi completo! Por favor, revisa tu correo electrónico (Gmail) para confirmar tu cuenta y poder iniciar sesión.');
+                    alert('¡Registro casi completo! Revisa tu correo electrónico para confirmar tu cuenta.');
                 }
             }
         } catch (err) {
@@ -107,24 +116,18 @@ const Auth = () => {
                 </div>
 
                 {/* Tabs */}
+                {/* Login Selection */}
                 <div className="flex bg-slate-100 p-1 rounded-xl mb-8">
                     <button
                         onClick={() => setAuthMode('login')}
-                        className={`flex-1 py-2.5 text-[12px] font-bold rounded-lg transition-all ${authMode === 'login' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                        className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${authMode === 'login' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                             }`}
                     >
-                        Admin Login
-                    </button>
-                    <button
-                        onClick={() => setAuthMode('terminal')}
-                        className={`flex-1 py-2.5 text-[12px] font-bold rounded-lg transition-all ${authMode === 'terminal' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                            }`}
-                    >
-                        Modo Terminal
+                        Acceso General
                     </button>
                     <button
                         onClick={() => setAuthMode('signup')}
-                        className={`flex-1 py-2.5 text-[12px] font-bold rounded-lg transition-all ${authMode === 'signup' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                        className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${authMode === 'signup' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                             }`}
                     >
                         Registro
@@ -141,65 +144,48 @@ const Auth = () => {
                 <form onSubmit={handleAuth} className="space-y-5">
                     <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">
-                            {authMode === 'terminal' ? 'Identificador de Terminal' : 'Email'}
+                            {authMode === 'signup' ? 'Email' : 'Usuario, Email o Terminal'}
                         </label>
                         <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                 <Mail className="h-5 w-5 text-slate-400" />
                             </div>
                             <input
-                                type={authMode === 'terminal' ? 'text' : 'email'}
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                type={authMode === 'signup' ? 'email' : 'text'}
+                                value={identifier}
+                                onChange={(e) => setIdentifier(e.target.value)}
                                 className="block w-full pl-11 pr-4 py-3 bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all outline-none text-slate-900 placeholder:text-slate-400"
-                                placeholder={authMode === 'terminal' ? 'caja01_norte' : 'tu@email.com'}
+                                placeholder={authMode === 'signup' ? 'tu@email.com' : 'Ej. admin@test.com o cajero01'}
                                 required
                             />
                         </div>
                     </div>
 
-                    {authMode !== 'terminal' ? (
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">Contraseña</label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <Lock className="h-5 w-5 text-slate-400" />
-                                </div>
-                                <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="block w-full pl-11 pr-12 py-3 bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all outline-none text-slate-900 placeholder:text-slate-400"
-                                    placeholder="••••••••"
-                                    required
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600"
-                                >
-                                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                                </button>
+                    <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">
+                            {authMode === 'signup' ? 'Contraseña' : 'Contraseña o Matrícula'}
+                        </label>
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <Lock className="h-5 w-5 text-slate-400" />
                             </div>
+                            <input
+                                type={showPassword ? 'text' : 'password'}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="block w-full pl-11 pr-12 py-3 bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all outline-none text-slate-900 placeholder:text-slate-400"
+                                placeholder="••••••••"
+                                required
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600"
+                            >
+                                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                            </button>
                         </div>
-                    ) : (
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">Código de Acceso de Terminal</label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <Lock className="h-5 w-5 text-slate-400" />
-                                </div>
-                                <input
-                                    type="text"
-                                    value={terminalCode}
-                                    onChange={(e) => setTerminalCode(e.target.value)}
-                                    className="block w-full pl-11 pr-4 py-3 bg-slate-50 border-0 ring-1 ring-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all outline-none text-slate-900 placeholder:text-slate-400"
-                                    placeholder="Ej. 1234"
-                                    required
-                                />
-                            </div>
-                        </div>
-                    )}
+                    </div>
 
                     <button
                         type="submit"
@@ -211,7 +197,7 @@ const Auth = () => {
                         ) : (
                             <LogIn className="w-5 h-5" />
                         )}
-                        {authMode === 'terminal' ? 'Activar Terminal' : (authMode === 'login' ? 'Iniciar Sesión' : 'Registrarse')}
+                        {authMode === 'login' ? 'Entrar al Sistema' : 'Crear Cuenta'}
                     </button>
                 </form>
 

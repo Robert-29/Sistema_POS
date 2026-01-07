@@ -1,33 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import {
-    Building2,
-    MapPin,
-    Phone,
-    Mail,
-    Link as LinkIcon,
-    Edit3,
-    Plus,
-    CheckCircle2,
-    Save,
-    X,
-    FileText
-} from 'lucide-react';
+import { Edit3, Building2, Plus, X, Save, MapPin, Phone, Mail, Link as LinkIcon, FileText, CheckCircle2 } from 'lucide-react';
+import useStore from '../store/useStore';
 
-const Dashboard = ({ negocio: initialNegocio }) => {
+const Dashboard = () => {
+    const { business, user, posSession, employeeSession, initialize } = useStore();
     const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [negocio, setNegocio] = useState(initialNegocio);
-    const [formData, setFormData] = useState(initialNegocio);
+    const [formData, setFormData] = useState(null);
 
     useEffect(() => {
-        setNegocio(initialNegocio);
-        setFormData(initialNegocio);
-    }, [initialNegocio]);
+        if (business) {
+            setFormData(business);
+        }
+    }, [business]);
 
     const getRemainingDays = () => {
-        if (!negocio?.actualizado_stock_en) return 0;
-        const lastUpdate = new Date(negocio.actualizado_stock_en);
+        if (!business?.actualizado_stock_en) return 0;
+        const lastUpdate = new Date(business.actualizado_stock_en);
         const now = new Date();
         const diffTime = Math.abs(now - lastUpdate);
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -53,7 +42,7 @@ const Dashboard = ({ negocio: initialNegocio }) => {
             };
 
             // Solo actualizar la fecha si el tipo de stock realmente cambió
-            if (formData.tipo_inventario !== negocio.tipo_inventario) {
+            if (formData.tipo_inventario !== business.tipo_inventario) {
                 if (!canChangeStock) {
                     throw new Error(`Debes esperar ${remainingDays} días más para cambiar el tipo de stock.`);
                 }
@@ -63,18 +52,11 @@ const Dashboard = ({ negocio: initialNegocio }) => {
             const { error } = await supabase
                 .from('perfiles_negocio')
                 .update(updates)
-                .eq('id', negocio.id);
+                .eq('id', business.id);
 
             if (error) throw error;
 
-            const { data: updatedNegocio } = await supabase
-                .from('perfiles_negocio')
-                .select('*')
-                .eq('id', negocio.id)
-                .single();
-
-            setNegocio(updatedNegocio);
-            setFormData(updatedNegocio);
+            await initialize(); // Refrescamos el estado global
             setIsEditing(false);
         } catch (error) {
             console.error('Error al actualizar:', error);
@@ -85,7 +67,7 @@ const Dashboard = ({ negocio: initialNegocio }) => {
     };
 
     const handleCancel = () => {
-        setFormData(negocio);
+        setFormData(business);
         setIsEditing(false);
     };
 
@@ -93,6 +75,8 @@ const Dashboard = ({ negocio: initialNegocio }) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
+
+    if (!business || !formData) return null;
 
     return (
         <div className="p-8 lg:p-12">
@@ -124,10 +108,10 @@ const Dashboard = ({ negocio: initialNegocio }) => {
                                     className="text-3xl font-extrabold text-slate-900 bg-slate-50 border-b-2 border-blue-600 outline-none w-full max-md"
                                 />
                             ) : (
-                                <h2 className="text-3xl font-extrabold text-slate-900">{negocio?.nombre_negocio}</h2>
+                                <h2 className="text-3xl font-extrabold text-slate-900">{business?.nombre_negocio}</h2>
                             )}
                             <p className="text-slate-500 font-medium flex items-center gap-2 mt-1 uppercase tracking-wider text-xs">
-                                RFC: <span className="text-slate-900 font-bold">{negocio?.rfc || 'No registrado'}</span>
+                                RFC: <span className="text-slate-900 font-bold">{business?.rfc || 'No registrado'}</span>
                             </p>
                         </div>
                         <div className="flex gap-3">
@@ -161,22 +145,22 @@ const Dashboard = ({ negocio: initialNegocio }) => {
                         </div>
                     </div>
                 </div>
-            </div>
+            </div >
 
             {/* Cards Grid */}
-            <div className="grid grid-cols-1 gap-8">
+            < div className="grid grid-cols-1 gap-8" >
 
                 {/* Contact Information */}
-                <div className="bg-white rounded-[32px] p-10 border border-slate-100 shadow-sm h-full flex flex-col">
+                < div className="bg-white rounded-[32px] p-10 border border-slate-100 shadow-sm h-full flex flex-col" >
                     <div className="flex items-center justify-between mb-8">
                         <h3 className="text-xl font-bold text-slate-900">Información de la Empresa</h3>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-y-10 gap-x-12 flex-1">
-                        <ContactItem 
+                        <ContactItem
                             icon={<MapPin />}
                             label="Dirección"
                             name="direccion"
-                            value={negocio?.direccion}
+                            value={business?.direccion}
                             isEditing={isEditing}
                             formData={formData}
                             onChange={handleChange}
@@ -185,7 +169,7 @@ const Dashboard = ({ negocio: initialNegocio }) => {
                             icon={<Phone />}
                             label="Teléfono"
                             name="telefono"
-                            value={negocio?.telefono}
+                            value={business?.telefono}
                             isEditing={isEditing}
                             formData={formData}
                             onChange={handleChange}
@@ -194,7 +178,7 @@ const Dashboard = ({ negocio: initialNegocio }) => {
                             icon={<Mail />}
                             label="Correo Electrónico"
                             name="email_contacto"
-                            value={negocio?.email_contacto}
+                            value={business?.email_contacto}
                             isEditing={isEditing}
                             formData={formData}
                             onChange={handleChange}
@@ -203,7 +187,7 @@ const Dashboard = ({ negocio: initialNegocio }) => {
                             icon={<LinkIcon />}
                             label="Sitio Web"
                             name="sitio_web"
-                            value={negocio?.sitio_web}
+                            value={business?.sitio_web}
                             isEditing={isEditing}
                             formData={formData}
                             onChange={handleChange}
@@ -212,7 +196,7 @@ const Dashboard = ({ negocio: initialNegocio }) => {
                             icon={<FileText />}
                             label="RFC"
                             name="rfc"
-                            value={negocio?.rfc}
+                            value={business?.rfc}
                             isEditing={isEditing}
                             formData={formData}
                             onChange={handleChange}
@@ -221,7 +205,7 @@ const Dashboard = ({ negocio: initialNegocio }) => {
                             icon={<Building2 />}
                             label="Región"
                             name="region"
-                            value={negocio?.region}
+                            value={business?.region}
                             isEditing={isEditing}
                             formData={formData}
                             onChange={handleChange}
@@ -230,7 +214,7 @@ const Dashboard = ({ negocio: initialNegocio }) => {
                             icon={<Plus />}
                             label="Moneda"
                             name="moneda"
-                            value={negocio?.moneda}
+                            value={business?.moneda}
                             isEditing={isEditing}
                             formData={formData}
                             onChange={handleChange}
@@ -239,7 +223,7 @@ const Dashboard = ({ negocio: initialNegocio }) => {
                             icon={<CheckCircle2 />}
                             label="Tipo de Stock"
                             name="tipo_inventario"
-                            value={negocio?.tipo_inventario}
+                            value={business?.tipo_inventario}
                             isEditing={isEditing}
                             formData={formData}
                             onChange={handleChange}
@@ -248,9 +232,9 @@ const Dashboard = ({ negocio: initialNegocio }) => {
                             remainingDays={remainingDays}
                         />
                     </div>
-                </div>
-            </div>
-        </div>
+                </div >
+            </div >
+        </div >
     );
 };
 
@@ -271,8 +255,8 @@ const ContactItem = ({ icon, label, value, isEditing, formData, onChange, name, 
                             disabled={!canChangeStock}
                             className={`w-full bg-slate-50 border-b-2 outline-none text-slate-900 font-bold text-[15px] py-1 ${!canChangeStock ? 'border-slate-200 opacity-50 cursor-not-allowed' : 'border-blue-600'}`}
                         >
-                            <option value="compartido">Stock compartido</option>
-                            <option value="unico">Stock único por sucursal</option>
+                            <option value="unico">Stock Global (Compartido)</option>
+                            <option value="sucursal">Stock por Sucursal (Independiente)</option>
                         </select>
                         {!canChangeStock && (
                             <p className="text-[10px] text-red-500 font-bold">Podrás cambiarlo en {remainingDays} días</p>
@@ -289,7 +273,7 @@ const ContactItem = ({ icon, label, value, isEditing, formData, onChange, name, 
             ) : (
                 <p className="text-slate-900 font-bold text-[15px] truncate">
                     {name === 'tipo_inventario'
-                        ? (value === 'compartido' ? 'Stock compartido' : 'Stock único por sucursal')
+                        ? (value === 'unico' ? 'Stock Global' : 'Stock por Sucursal')
                         : (value || 'No disponible')}
                 </p>
             )}

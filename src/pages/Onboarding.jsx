@@ -6,7 +6,7 @@ import { Building2, Globe, Package, ArrowRight, DollarSign, MapPin, Phone, Mail,
 const Onboarding = () => {
     const [nombreNegocio, setNombreNegocio] = useState('');
     const [region, setRegion] = useState('');
-    const [tipoInventario, setTipoInventario] = useState('compartido'); // Usando 'compartido' como valor por defecto para tipo_inventario
+    const [tipoInventario, setTipoInventario] = useState('unico'); // Usando 'unico' (Global) como valor por defecto
     const [moneda, setMoneda] = useState('MXN');
 
     const [loading, setLoading] = useState(false);
@@ -28,17 +28,17 @@ const Onboarding = () => {
                 .from('perfiles_negocio')
                 .insert([
                     {
-                        id: user.id,
+                        user_id: user.id,
                         nombre_negocio: nombreNegocio,
                         region,
-                        tipo_inventario: tipoInventario, // Se guarda como stock compartido o único
+                        tipo_inventario: tipoInventario,
                         moneda,
                     }
                 ]);
 
             if (profileError) throw profileError;
 
-            navigate('/');
+            window.location.href = '/';
         } catch (err) {
             setError(err.message);
         } finally {
@@ -112,7 +112,7 @@ const Onboarding = () => {
                                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-4 bg-slate-900 text-white text-xs rounded-2xl shadow-xl z-10 animate-in fade-in zoom-in-95 duration-200">
                                                 <div className="space-y-2">
                                                     <p><span className="font-bold text-blue-400">Stock compartido:</span> El inventario se sincroniza automáticamente entre todas tus tiendas o sucursales.</p>
-                                                    <p><span className="font-bold text-emerald-400">Stock único:</span> Cada sucursal gestiona su propio inventario de forma independiente.</p>
+                                                    <p><span className="font-bold text-emerald-400">Stock por sucursal:</span> Cada sucursal gestiona su propio inventario de forma independiente.</p>
                                                 </div>
                                                 <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900"></div>
                                             </div>
@@ -128,8 +128,8 @@ const Onboarding = () => {
                                         onChange={(e) => setTipoInventario(e.target.value)}
                                         className="block w-full pl-11 pr-4 py-4 bg-slate-50 border-0 ring-1 ring-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all outline-none text-slate-900 appearance-none font-medium"
                                     >
-                                        <option value="compartido">Stock compartido</option>
-                                        <option value="unico">Stock único por sucursal</option>
+                                        <option value="unico">Stock Global (Compartido)</option>
+                                        <option value="sucursal">Stock por Sucursal (Independiente)</option>
                                     </select>
                                 </div>
                             </div>

@@ -15,7 +15,10 @@ import {
     Clock
 } from 'lucide-react';
 
-const Configuracion = ({ negocio }) => {
+import useStore from '../store/useStore';
+
+const Configuracion = () => {
+    const { business } = useStore();
     const [activeTab, setActiveTab] = useState('general');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState(null);
@@ -23,15 +26,30 @@ const Configuracion = ({ negocio }) => {
 
     // Form state for General settings
     const [perfil, setPerfil] = useState({
-        nombre_negocio: negocio?.nombre_negocio || '',
-        rfc: negocio?.rfc || '',
-        direccion: negocio?.direccion || '',
-        telefono: negocio?.telefono || '',
-        email_contacto: negocio?.email_contacto || '',
-        sitio_web: negocio?.sitio_web || '',
-        moneda: negocio?.moneda || 'USD',
-        tipo_inventario: negocio?.tipo_inventario || 'shared'
+        nombre_negocio: business?.nombre_negocio || '',
+        rfc: business?.rfc || '',
+        direccion: business?.direccion || '',
+        telefono: business?.telefono || '',
+        email_contacto: business?.email_contacto || '',
+        sitio_web: business?.sitio_web || '',
+        moneda: business?.moneda || 'USD',
+        tipo_inventario: business?.tipo_inventario || 'unico'
     });
+
+    useEffect(() => {
+        if (business) {
+            setPerfil({
+                nombre_negocio: business.nombre_negocio || '',
+                rfc: business.rfc || '',
+                direccion: business.direccion || '',
+                telefono: business.telefono || '',
+                email_contacto: business.email_contacto || '',
+                sitio_web: business.sitio_web || '',
+                moneda: business.moneda || 'USD',
+                tipo_inventario: business.tipo_inventario || 'unico'
+            });
+        }
+    }, [business]);
 
     // Form state for new branch
     const [nuevaSucursal, setNuevaSucursal] = useState({
@@ -47,11 +65,12 @@ const Configuracion = ({ negocio }) => {
     }, [activeTab]);
 
     const fetchSucursales = async () => {
+        if (!business) return;
         setLoading(true);
         const { data, error } = await supabase
             .from('sucursales')
             .select('*')
-            .eq('id_negocio', negocio.id)
+            .eq('id_negocio', business.id)
             .order('creado_en', { ascending: true });
 
         if (error) console.error('Error fetching sucursales:', error);
@@ -67,7 +86,7 @@ const Configuracion = ({ negocio }) => {
         const { error } = await supabase
             .from('perfiles_negocio')
             .update(perfil)
-            .eq('id', negocio.id);
+            .eq('id', business.id);
 
         if (error) {
             setMessage({ type: 'error', text: 'Error al actualizar el perfil: ' + error.message });
@@ -82,7 +101,7 @@ const Configuracion = ({ negocio }) => {
         setLoading(true);
         const { error } = await supabase
             .from('sucursales')
-            .insert([{ ...nuevaSucursal, id_negocio: negocio.id }]);
+            .insert([{ ...nuevaSucursal, id_negocio: business.id }]);
 
         if (error) {
             setMessage({ type: 'error', text: 'Error al crear sucursal: ' + error.message });
@@ -242,12 +261,11 @@ const Configuracion = ({ negocio }) => {
                                         value={perfil.tipo_inventario}
                                         onChange={e => setPerfil({ ...perfil, tipo_inventario: e.target.value })}
                                         className="w-full px-4 py-3 bg-slate-50 border-0 ring-1 ring-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all outline-none font-bold"
-                                        disabled={true} // Constraint implemented as per instructions
                                     >
-                                        <option value="shared">Stock Compartido</option>
-                                        <option value="per_branch">Stock por Sucursal</option>
+                                        <option value="unico">Stock Global (Compartido)</option>
+                                        <option value="sucursal">Stock por Sucursal (Independiente)</option>
                                     </select>
-                                    <p className="text-[11px] text-slate-400 mt-1 italic">El tipo de stock solo puede cambiarse cada 60 días. Contacte a soporte si necesita ayuda.</p>
+                                    <p className="text-[11px] text-slate-400 mt-1 italic">Cambia a "Stock por Sucursal" si deseas gestionar inventarios separados.</p>
                                 </div>
                             </div>
                         </div>
